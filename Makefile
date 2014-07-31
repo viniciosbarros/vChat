@@ -12,7 +12,7 @@ DEPS=
 OBJ=  
 
 all:
-	$(CC) -o pchat pClient.c
+	$(CC) -o vchat vClient.c
 	$(CC) -o server server.c
 
 clean:
