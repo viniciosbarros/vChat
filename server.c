@@ -2,7 +2,7 @@
 
 by vinicios - July 2014
 
-Server vChat - servidor de mensagens instantaneas
+Server vChat - servidor Chat messages
 
 */
 
@@ -10,12 +10,15 @@ Server vChat - servidor de mensagens instantaneas
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <syslog.h>
+#include <signal.h>
+#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <netdb.h>
-	
+
+
 #define PORT 9055
 #define BUFSIZE 1024
 
@@ -37,14 +40,14 @@ void send_recv(int i, fd_set *master, int sockfd, int fdmax)
 	
 	if ((nbytes_recvd = recv(i, recv_buf, BUFSIZE, 0)) <= 0) {
 		if (nbytes_recvd == 0) {
-			printf("socket %d terminated\n", i);
+			syslog(LOG_NOTICE,"socket %d terminated\n", i);
 		}else {
 			perror("recv");
 		}
 		close(i);
 		FD_CLR(i, master);
 	}else {
-		printf("%s\n", recv_buf);
+		//printf("%s\n", recv_buf);
 		for(j = 0; j <= fdmax; j++){
 			send_to_all(j, i, sockfd, nbytes_recvd, recv_buf, master );
 		}
@@ -65,7 +68,9 @@ void connection_accept(fd_set *master, int *fdmax, int sockfd, struct sockaddr_i
 		if(newsockfd > *fdmax){
 			*fdmax = newsockfd;
 		}
-		printf("Connection established with %s on port %d \n",inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
+		syslog(LOG_NOTICE,"Connection established with %s on port %d \n",
+			inet_ntoa(client_addr->sin_addr), 
+			ntohs(client_addr->sin_port));
 	}
 }
 	
@@ -96,9 +101,58 @@ void connect_request(int *sockfd, struct sockaddr_in *my_addr)
 		perror("listen");
 		exit(1);
 	}
-	printf("\nTCPServer Waiting for client on port %d\n", PORT);
+	//printf("\n TCPServer Waiting for client on port %d\n", PORT);
+	syslog (LOG_NOTICE, "Listening clients on port %d", PORT);
 	fflush(stdout);
 }
+
+static void deamonize()
+{
+    pid_t pid;
+
+    // Fork parent
+    pid = fork();
+
+    // error treated
+    if (pid < 0)
+        exit(EXIT_FAILURE);
+
+    // terminate parent
+    if (pid > 0)    
+        exit(EXIT_SUCCESS);
+
+    // child becomes master ;) 
+    if (setsid() < 0)
+        exit(EXIT_FAILURE);
+
+    // fork again
+    pid = fork();
+
+    // error treat again - todo: check it out later
+    if (pid < 0)
+        exit(EXIT_FAILURE);
+
+    // terminate parent again - todo: check it out later
+    if (pid > 0)
+        exit(EXIT_SUCCESS);
+
+    // chg permission
+    umask(0);
+
+    // chg to root dir
+    chdir("/");
+
+    // just close all file desc
+    int x;
+    for (x = sysconf(_SC_OPEN_MAX); x>0; x--)
+    {
+        close (x);
+    }
+
+    // init log
+    openlog("vChatServer", LOG_PID, LOG_DAEMON);
+}
+
 int main()
 {
 	fd_set master;
@@ -107,12 +161,20 @@ int main()
 	int sockfd= 0;
 	struct sockaddr_in my_addr, client_addr;
 	
+	// * deamonize the server *
+	deamonize();
+	syslog (LOG_NOTICE, "vCHAT in the flow");
+
+
 	FD_ZERO(&master);
 	FD_ZERO(&read_fds);
 	connect_request(&sockfd, &my_addr);
 	FD_SET(sockfd, &master);
 	
 	fdmax = sockfd;
+
+	syslog (LOG_NOTICE, "vCHAT will be looped");
+
 	while(1){
 		read_fds = master;
 		if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1){
