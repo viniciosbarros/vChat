@@ -12,8 +12,8 @@ DEPS=
 OBJ=  
 
 all:
-	$(CC) -o vchat vClient.c
-	$(CC) -o server server.c
+	$(CC) -o ./bin/vchat  vClient.c
+	$(CC) -o ./bin/server server.c
 
 clean:
-	/bin/rm -f *.o pchat server
+	/bin/rm -f *.o ./bin/vchat ./bin/server
