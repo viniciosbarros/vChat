@@ -23,8 +23,8 @@ Server vChat - servidor Chat messages
 
 void send_to_all(int, int, int, int, char *, fd_set *);
 void send_recv(int, fd_set *, int, int);
-void connection_accept(fd_set *, int, int, struct sockaddr_in *);
-void connect_request(int, struct sockaddr_in *);
+void connection_accept(fd_set *, int *, int, struct sockaddr_in *);
+void connect_request(int *, struct sockaddr_in *);
 
 void
 send_to_all(int j, int i, int sockfd, int nbytes_recvd, char *recv_buf,
@@ -43,7 +43,7 @@ void
 send_recv(int i, fd_set * master, int sockfd, int fdmax)
 {
 	int nbytes_recvd, j;
-	char recv_buf[BUFSIZE], buf[BUFSIZE];
+	char recv_buf[BUFSIZE];
 
 	nbytes_recvd = recv(i, recv_buf, BUFSIZE, 0);
 	switch (nbytes_recvd) {
