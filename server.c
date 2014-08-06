@@ -17,9 +17,22 @@ Server vChat - servidor Chat messages
 #include <unistd.h>
 #include <syslog.h>
 #include <signal.h>
+/* Libevent. */
+#include <event2/event.h>
+#include <event2/event_struct.h>
+#include <event2/bufferevent.h>
+#include <event2/buffer.h>
 
 #define PORT 9055
 #define BUFSIZE 1024
+
+static struct event_base *evbase;
+
+struct client {
+  int fd;
+  struct bufferevent *buf_ev;
+  TAILQ_ENTRY(client) entries;
+};
 
 void send_to_all(int, int, int, int, char *, fd_set *);
 void send_recv(int, fd_set *, int, int);
@@ -76,7 +89,8 @@ connection_accept(fd_set * master, int *fdmax, int sockfd,
 		accept(sockfd, (struct sockaddr *) client_addr,
 		    &addrlen)) == -1) {
 		perror("accept");
-		exit(1);
+		FD_CLR(fdmax,master);
+		break;
 	} else {
 		FD_SET(newsockfd, master);
 		if (newsockfd > *fdmax)
