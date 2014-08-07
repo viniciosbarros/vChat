@@ -8,6 +8,7 @@ Server vChat - servidor Chat messages
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -26,7 +27,7 @@ Server vChat - servidor Chat messages
 #define PORT 9055
 #define BUFSIZE 1024
 
-static struct event_base *evbase;
+static struct event_base *event_base;
 
 struct client {
   int fd;
@@ -89,8 +90,7 @@ connection_accept(fd_set * master, int *fdmax, int sockfd,
 		accept(sockfd, (struct sockaddr *) client_addr,
 		    &addrlen)) == -1) {
 		perror("accept");
-		FD_CLR(fdmax,master);
-		break;
+		FD_CLR(sockfd,master);
 	} else {
 		FD_SET(newsockfd, master);
 		if (newsockfd > *fdmax)
@@ -133,7 +133,6 @@ connect_request(int *sockfd, struct sockaddr_in *my_addr)
 		perror("listen");
 		exit(1);
 	}
-	//printf("\n TCPServer Waiting for client on port %d\n", PORT);
 	syslog(LOG_NOTICE, "Listening clients on port %d", PORT);
 	fflush(stdout);
 }
@@ -146,11 +145,14 @@ main()
 	int fdmax, i;
 	int sockfd = 0;
 	struct sockaddr_in my_addr, client_addr;
+  struct event event_accept;
 
 	// deamonize the server
 	daemon(0, 0);
 	openlog("vChatServer", LOG_PID, LOG_DAEMON);
 	syslog(LOG_NOTICE, "vCHAT in the flow");
+
+  event_base = event_base_new();
 
 	FD_ZERO(&master);
 	FD_ZERO(&read_fds);

@@ -7,13 +7,13 @@
 
 
 CC=gcc
-CFLAGS=
+CFLAGS=-levent 
 DEPS= 
 OBJ=  
 
 all:
-	$(CC) -o ./bin/vchat  vClient.c
-	$(CC) -o ./bin/server server.c
+	$(CC) $(CFLAGS)-o ./bin/vchat  vClient.c
+	$(CC) $(CFLAGS) -o ./bin/server server.c
 
 clean:
 	/bin/rm -f *.o ./bin/vchat ./bin/server
