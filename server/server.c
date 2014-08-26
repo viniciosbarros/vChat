@@ -34,14 +34,13 @@ static struct event_base *ev_base;
 TAILQ_HEAD(, client) client_list;
 
 #define DPRINTF(fmt, args...) \
-	fprintf(stderr, "D: " fmt "\n", ## args);
+	fprintf(stderr, "vChatServerDaemonDebug: " fmt "\n", ## args);
 
-void send_to_all(struct bufferevent *, void *);
-/*void send_to_all(int, int, int, int, char *, fd_set*);*/
-void send_recv(int, fd_set *, int, int);
+static int  changeTononblock(int *);
+static void peer_read_cb(struct bufferevent *, void *);
 static void connection_accept(int, short, void *);
 static void connect_request(int *);
-int changeTononblock(int *);
+
 
 
 int 
@@ -59,66 +58,6 @@ changeTononblock(int *fd)
 	return 0;
 }
 
-
-void
-/*send_to_all(int j, int i, int sockfd, int nbytes_recvd, char *recv_buf,
-    fd_set * master)*/
-send_to_all(struct bufferevent *buf_ev, void *arg)
-{
-	/*if (FD_ISSET(j, master)) {
-		if (j != sockfd && j != i) {
-			if (send(j, recv_buf, nbytes_recvd, 0) == -1) {
-				perror("send");
-			}
-		}
-	}*/
-
-	size_t n;
-	struct client *c = arg;
-	struct client *client;
-	uint8_t data[BUFSIZE];
-
-	while(1){
-		n = bufferevent_read(buf_ev, data, sizeof(data));
-		if (n <= 0){
-			bufferevent_free(buf_ev);
-			close(c->fd);
-			free(c);
-		}
-
-		TAILQ_FOREACH(client, &client_list, entries) {
-			if (client != c) {
-				bufferevent_write(client->buf_ev, data, n);
-			}
-		}
-	}
-
-}
-
-void
-send_recv(int i, fd_set * master, int sockfd, int fdmax)
-{
-	int nbytes_recvd, j;
-	char recv_buf[BUFSIZE];
-
-	nbytes_recvd = recv(i, recv_buf, BUFSIZE, 0);
-	switch (nbytes_recvd) {
-	case 0:
-		DPRINTF("socket %d was unexpected terminated by remote\n", i);
-		close(i);
-		FD_CLR(i, master);
-	case -1:
-		DPRINTF("Error: socket %d will be terminated\n", i);
-		close(i);
-		FD_CLR(i, master);
-	default:
-		for (j = 0; j <= fdmax; j++) {
-			/*send_to_all(j, i, sockfd, nbytes_recvd, recv_buf,
-			    master, void *void);*/
-		}
-	}
-}
-
 void
 peer_read_cb(struct bufferevent *bufev, void *bula)
 {
@@ -129,22 +68,22 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 
 	dlen = bufferevent_read(bufev, buf, sizeof(buf));
 	if (dlen == 0) {
+		DPRINTF("Client: %d disconnected by remote\n", c->fd);
 		bufferevent_free(bufev);
 		close(c->fd);
 		free(c);
-
-		fprintf(stderr, "Client disconnected\n");
 	}
 
 	buf[dlen] = 0;
 
-	fprintf(stderr, "### %s\n", buf);
-
+	DPRINTF("### %s\n", buf);
+	
 	TAILQ_FOREACH(client, &client_list, entries) {
-		/* if (client != c) { */ /*Send to all even the sender*/
+		if (client != c) {
 			bufferevent_write(client->buf_ev, buf, dlen);
-		/*}*/
+		}
 	}
+	
 
 }
 
@@ -176,11 +115,11 @@ connection_accept(int fd, short event, void *bula)
 	c->buf_ev = bufferevent_socket_new(ev_base, newsockfd, 0);
 	bufferevent_setcb(c->buf_ev, peer_read_cb, NULL, NULL, c);
 
-	/*c->buf_ev = bufferevent_new(c->fd, peer_read_cb, NULL, NULL, c);*/
 	bufferevent_enable(c->buf_ev, EV_READ);
 
-	DPRINTF("Connection established with %s on port %d \n",
+	DPRINTF("Connection established with %s on port %d\n",
 	     inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
+
 }
 
 static void

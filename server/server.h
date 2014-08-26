@@ -14,9 +14,9 @@ Server vChat - servidor Chat messages
 struct client {
   int fd;
   struct bufferevent *buf_ev;
+  struct event ev_read;
+  struct event ev_write;
   TAILQ_ENTRY(client) entries;
 };
-
-void peer_read_cb(struct bufferevent *, void *);
 
 #endif /* _SERVER_H_ */
