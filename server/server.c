@@ -200,24 +200,29 @@ connect_request(int *sockfd)
 
 	if (bind(*sockfd, (struct sockaddr *) &sin, sizeof(sin)) == -1) {
 		close(*sockfd);
-		err(1, "bind");
+		err(5, "bind");
 	}
 
 	if (setsockopt(*sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
 	    sizeof(int)) == -1) {
 		close(*sockfd);
-		err(1, "setsockopt");
+		err(2, "setsockopt");
 	}
 
 	if (listen(*sockfd, 10) == -1) {
 		close(*sockfd);
-		err(1, "listen");
+		err(3, "listen");
 	}
 
 	if(changeTononblock(sockfd) < 0){
 		close(*sockfd);
-		err(1, "change to non-block");	
+		err(4, "change to non-block");	
 	}
+
+	event_set(&ev_accept, *sockfd, EV_READ|EV_PERSIST, connection_accept, NULL);
+	event_add(&ev_accept, NULL);
+
+	event_dispatch();
 
 	DPRINTF("Listening clients on port %d", PORT);
 }
@@ -238,12 +243,7 @@ main(int argc, char *argv[])
 
 	connect_request(&sockfd);
 
-	event_set(&ev_accept, sockfd, EV_READ, connection_accept, NULL);
-	event_add(&ev_accept, NULL);
-
 	DPRINTF("vCHAT will be looped");
-
-	event_dispatch();
 
 	exit(EXIT_SUCCESS);
 }
