@@ -25,16 +25,16 @@ Server vChat - servidor Chat messages
 #include <event.h>
 #include "server.h"
 
-#define PORT 9055
+#define DPRINTF(fmt, args...) \
+	fprintf(stderr, "vChatServerDaemonDebug: " fmt "\n", ## args);
+
+#define PORT 	9055
 #define BUFSIZE 1024
 
 static struct event ev_accept;
 static struct event_base *ev_base;
 
 TAILQ_HEAD(, client) client_list;
-
-#define DPRINTF(fmt, args...) \
-	fprintf(stderr, "vChatServerDaemonDebug: " fmt "\n", ## args);
 
 static int  changeTononblock(int *);
 static void peer_read_cb(struct bufferevent *, void *);
@@ -68,9 +68,9 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 
 	dlen = bufferevent_read(bufev, buf, sizeof(buf));
 	if (dlen == 0) {
-		DPRINTF("Client: %d disconnected by remote\n", c->fd);
+		DPRINTF("Client: %d disconnected by remote\n", c->cl_fd);
 		bufferevent_free(bufev);
-		close(c->fd);
+		close(c->cl_fd);
 		free(c);
 	}
 
@@ -78,13 +78,11 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 
 	DPRINTF("### %s\n", buf);
 	
-	TAILQ_FOREACH(client, &client_list, entries) {
+	TAILQ_FOREACH(client, &client_list, cl_entries) {
 		if (client != c) {
-			bufferevent_write(client->buf_ev, buf, dlen);
+			bufferevent_write(client->cl_buf_ev, buf, dlen);
 		}
 	}
-	
-
 }
 
 static void
@@ -109,13 +107,13 @@ connection_accept(int fd, short event, void *bula)
 		return;
 	}
 
-	c->fd = newsockfd;
-	TAILQ_INSERT_HEAD(&client_list, c, entries);
+	c->cl_fd = newsockfd;
+	TAILQ_INSERT_HEAD(&client_list, c, cl_entries);
 
-	c->buf_ev = bufferevent_socket_new(ev_base, newsockfd, 0);
-	bufferevent_setcb(c->buf_ev, peer_read_cb, NULL, NULL, c);
+	c->cl_buf_ev = bufferevent_socket_new(ev_base, newsockfd, 0);
+	bufferevent_setcb(c->cl_buf_ev, peer_read_cb, NULL, NULL, c);
 
-	bufferevent_enable(c->buf_ev, EV_READ);
+	bufferevent_enable(c->cl_buf_ev, EV_READ);
 
 	DPRINTF("Connection established with %s on port %d\n",
 	     inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));

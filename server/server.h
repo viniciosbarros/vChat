@@ -12,11 +12,11 @@ Server vChat - servidor Chat messages
 #include <sys/queue.h>
 
 struct client {
-  int fd;
-  struct bufferevent *buf_ev;
-  struct event ev_read;
-  struct event ev_write;
-  TAILQ_ENTRY(client) entries;
+  int cl_fd;
+  struct bufferevent *cl_buf_ev;
+  struct event cl_ev_read;
+  struct event cl_ev_write;
+  TAILQ_ENTRY(client) cl_entries;
 };
 
 #endif /* _SERVER_H_ */
