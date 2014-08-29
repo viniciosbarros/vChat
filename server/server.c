@@ -20,13 +20,10 @@ Server vChat - servidor Chat messages
 #include <fcntl.h>
 #include <syslog.h>
 #include <signal.h>
-
-/* Libevent. */
 #include <event.h>
+
 #include "server.h"
 
-#define DPRINTF(fmt, args...) \
-	fprintf(stderr, "vChatServerDaemonDebug: " fmt "\n", ## args);
 
 #define PORT 	9055
 #define BUFSIZE 1024
@@ -34,56 +31,25 @@ Server vChat - servidor Chat messages
 static struct event ev_accept;
 static struct event_base *ev_base;
 
-TAILQ_HEAD(, client) client_list;
-
-static int  changeTononblock(int *);
-static void peer_read_cb(struct bufferevent *, void *);
+static int  set_nonblock(int *);
 static void connection_accept(int, short, void *);
 static void connect_request(int *);
 
-
-
-int 
-changeTononblock(int *fd)
+int
+set_nonblock(int *fd)
 {
 	int flags;
 
 	flags = fcntl(*fd, F_GETFL);
-	if (flags < 0)
-		return flags;
+	if (flags == -1)
+		return (flags);
 	flags |= O_NONBLOCK;
 	if (fcntl(*fd, F_SETFL, flags) < 0)
-		return -1;
+		return (-1);
 
-	return 0;
+	return (0);
 }
 
-void
-peer_read_cb(struct bufferevent *bufev, void *bula)
-{
-	struct client *c = bula;
-	struct client *client;
-	size_t dlen;
-	char buf[512];
-
-	dlen = bufferevent_read(bufev, buf, sizeof(buf));
-	if (dlen == 0) {
-		DPRINTF("Client: %d disconnected by remote\n", c->cl_fd);
-		bufferevent_free(bufev);
-		close(c->cl_fd);
-		free(c);
-	}
-
-	buf[dlen] = 0;
-
-	DPRINTF("### %s\n", buf);
-	
-	TAILQ_FOREACH(client, &client_list, cl_entries) {
-		if (client != c) {
-			bufferevent_write(client->cl_buf_ev, buf, dlen);
-		}
-	}
-}
 
 static void
 connection_accept(int fd, short event, void *bula)
@@ -135,9 +101,10 @@ connect_request(int *sockfd)
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons(PORT);
 
-	if (bind(*sockfd, (struct sockaddr *) &sin, sizeof(sin)) == -1) {
+	if (bind(*sockfd, (struct sockaddr *) &sin, 
+		sizeof(sin)) == -1) {
 		close(*sockfd);
-		err(5, "bind");
+		err(1, "bind");
 	}
 
 	if (setsockopt(*sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
@@ -151,12 +118,13 @@ connect_request(int *sockfd)
 		err(3, "listen");
 	}
 
-	if(changeTononblock(sockfd) < 0){
+	if(set_nonblock(sockfd) == -1){
 		close(*sockfd);
-		err(4, "change to non-block");	
+		err(4, "change to non-block");
 	}
 
-	event_set(&ev_accept, *sockfd, EV_READ|EV_PERSIST, connection_accept, NULL);
+	event_set(&ev_accept, *sockfd, EV_READ|EV_PERSIST, 
+		connection_accept, NULL);
 	event_add(&ev_accept, NULL);
 
 	event_dispatch();
