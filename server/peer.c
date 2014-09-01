@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdlib.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -17,19 +18,21 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 	dlen = bufferevent_read(bufev, buf, sizeof(buf));
 	if (dlen == 0) {
 		DPRINTF("Client: %d disconnected by remote\n", c->cl_fd);
+		bufferevent_disable(bufev, EV_READ);
 		bufferevent_free(bufev);
 		close(c->cl_fd);
+		TAILQ_REMOVE(&client_list, c, cl_entries);
 		free(c);
+		return;
 	}
 
 	buf[dlen] = 0;
 
-	DPRINTF("### %s\n", buf);
+	DPRINTF("=> %s\n", buf);
 	
 	TAILQ_FOREACH(client, &client_list, cl_entries) {
-		if (client != c) {
+		if (client != c)
 			bufferevent_write(client->cl_buf_ev, buf, dlen);
-		}
 	}
 }
 

@@ -29,7 +29,6 @@ Server vChat - servidor Chat messages
 #define BUFSIZE 1024
 
 static struct event ev_accept;
-static struct event_base *ev_base;
 
 static int  set_nonblock(int *);
 static void connection_accept(int, short, void *);
@@ -76,8 +75,8 @@ connection_accept(int fd, short event, void *bula)
 	c->cl_fd = newsockfd;
 	TAILQ_INSERT_HEAD(&client_list, c, cl_entries);
 
-	c->cl_buf_ev = bufferevent_socket_new(ev_base, newsockfd, 0);
-	bufferevent_setcb(c->cl_buf_ev, peer_read_cb, NULL, NULL, c);
+	c->cl_buf_ev = bufferevent_new(c->cl_fd, peer_read_cb, NULL, NULL, c);
+ 	bufferevent_enable(c->cl_buf_ev, EV_READ);
 
 	bufferevent_enable(c->cl_buf_ev, EV_READ);
 
