@@ -5,6 +5,7 @@
 
 #include <event.h>
 
+#include "log.h"
 #include "server.h"
 
 void
@@ -17,7 +18,7 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 
 	dlen = bufferevent_read(bufev, buf, sizeof(buf));
 	if (dlen == 0) {
-		DPRINTF("Client: %d disconnected by remote\n", c->cl_fd);
+		log_debug("Client: %d disconnected by remote\n", c->cl_fd);
 		bufferevent_disable(bufev, EV_READ);
 		bufferevent_free(bufev);
 		close(c->cl_fd);

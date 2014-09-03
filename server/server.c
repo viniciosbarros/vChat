@@ -22,6 +22,7 @@ Server vChat - servidor Chat messages
 #include <signal.h>
 #include <event.h>
 
+#include "log.h"
 #include "server.h"
 
 
@@ -78,9 +79,7 @@ connection_accept(int fd, short event, void *bula)
 	c->cl_buf_ev = bufferevent_new(c->cl_fd, peer_read_cb, NULL, NULL, c);
  	bufferevent_enable(c->cl_buf_ev, EV_READ);
 
-	bufferevent_enable(c->cl_buf_ev, EV_READ);
-
-	DPRINTF("Connection established with %s on port %d\n",
+	log_debug("Connection established with %s on port %d\n",
 	     inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
 
 }
@@ -122,32 +121,70 @@ connect_request(int *sockfd)
 		err(4, "change to non-block");
 	}
 
+	log_debug("connect_request: [%d]",*sockfd);
+
 	event_set(&ev_accept, *sockfd, EV_READ|EV_PERSIST, 
 		connection_accept, NULL);
 	event_add(&ev_accept, NULL);
 
 	event_dispatch();
 
-	DPRINTF("Listening clients on port %d", PORT);
+	/* NOTREACHED */
+}
+
+static void
+usage(void)
+{
+	extern const char	*__progname;
+
+	fprintf(stderr, "%s: [ -d | -v ]\n"
+	    "-d: Debug mode (foreground)\n"
+	    "-v: Be verbose\n",
+	    __progname);
+
+	exit(EXIT_FAILURE);
 }
 
 int
 main(int argc, char *argv[])
 {
-	int sockfd;
+	int	sockfd;
+	int	ch;
+	uint32_t opts;
 
-	daemon(0, 1);
-	openlog("vChatServer", LOG_PID, LOG_DAEMON);
+#define OPTS_FOREGROUND	(1UL << 0)
+#define OPTS_VERBOSE	(1UL << 1)
+	while ((ch = getopt(argc, argv, "dv")) != -1) {
+		switch (ch) {
+		case 'd':
+			opts |= OPTS_FOREGROUND;
+			break;
+		case 'v':
+			opts |= OPTS_VERBOSE;
+			break;
 
-	DPRINTF("vCHAT in the flow");
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	if ((opts & OPTS_FOREGROUND) == 0) {
+		log_init(0);
+		daemon(0, 0);
+	} else
+		log_init(1);
+
+	if (opts & OPTS_VERBOSE)
+		log_verbose(1);
+
+	log_debug("vCHAT in the flow");
 
 	event_init();
 
 	TAILQ_INIT(&client_list);
 
 	connect_request(&sockfd);
-
-	DPRINTF("vCHAT will be looped");
 
 	exit(EXIT_SUCCESS);
 }

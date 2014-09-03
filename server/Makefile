@@ -9,6 +9,6 @@ LDFLAGS	+= -levent
 
 PROG	= server
 
-SRCS	= peer.c server.c
+SRCS	= log.c peer.c server.c
 
 .include <bsd.prog.mk>
