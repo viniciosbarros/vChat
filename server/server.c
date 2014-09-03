@@ -26,11 +26,12 @@ Server vChat - servidor Chat messages
 #include "server.h"
 
 
-#define PORT 	9055
-#define BUFSIZE 1024
+#define PORT		(9055)
+#define BUFSIZE		(1024)
 
-static struct event ev_accept;
+struct server_ctx sc;
 
+static void usage(void);
 static int  set_nonblock(int *);
 static void connection_accept(int, short, void *);
 static void connect_request(int *);
@@ -44,7 +45,7 @@ set_nonblock(int *fd)
 	if (flags == -1)
 		return (flags);
 	flags |= O_NONBLOCK;
-	if (fcntl(*fd, F_SETFL, flags) < 0)
+	if (fcntl(*fd, F_SETFL, flags) == -1)
 		return (-1);
 
 	return (0);
@@ -74,9 +75,9 @@ connection_accept(int fd, short event, void *bula)
 	}
 
 	c->cl_fd = newsockfd;
-	TAILQ_INSERT_HEAD(&client_list, c, cl_entries);
+	TAILQ_INSERT_HEAD(&sc.sc_clist, c, cl_entries);
 
-	c->cl_buf_ev = bufferevent_new(c->cl_fd, peer_read_cb, NULL, NULL, c);
+	c->cl_buf_ev = bufferevent_new(c->cl_fd, peer_read_cb, NULL, peer_error_cb, c);
  	bufferevent_enable(c->cl_buf_ev, EV_READ);
 
 	log_debug("Connection established with %s on port %d\n",
@@ -116,16 +117,14 @@ connect_request(int *sockfd)
 		err(3, "listen");
 	}
 
-	if(set_nonblock(sockfd) == -1){
+	if (set_nonblock(sockfd) == -1) {
 		close(*sockfd);
 		err(4, "change to non-block");
 	}
 
-	log_debug("connect_request: [%d]",*sockfd);
-
-	event_set(&ev_accept, *sockfd, EV_READ|EV_PERSIST, 
-		connection_accept, NULL);
-	event_add(&ev_accept, NULL);
+	event_set(&sc.sc_acceptev, *sockfd, EV_READ | EV_PERSIST,
+	    connection_accept, NULL);
+	event_add(&sc.sc_acceptev, NULL);
 
 	event_dispatch();
 
@@ -182,7 +181,7 @@ main(int argc, char *argv[])
 
 	event_init();
 
-	TAILQ_INIT(&client_list);
+	TAILQ_INIT(&sc.sc_clist);
 
 	connect_request(&sockfd);
 
