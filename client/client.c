@@ -28,22 +28,42 @@ struct User
 	char room[WORD];
 };
 
-int auth(struct User);
+int auth(struct User, int);
 int cmd_prompt(struct User);
 void close_session(struct User,int);
 void send_recv(int, int,struct User);
 int connect_request(int*, struct sockaddr_in*);
 
 int
-auth(struct User user)
+auth(struct User user, int sockfd)
 {
 	char pass[WORD];
+	char send_buf[BUFSIZE];
+	char recv_buf[BUFSIZE];
+	int nbyte_recvd;
 
 	printf("%s vChat(%s) password: ", user.name, SERVER_IP);
 	system("stty -echo");
 	gets(pass);
 	system("stty echo");
 	strcpy(user.passwd, pass);
+
+	sprintf(send_buf, "/connect %s %s", user.name, user.passwd);
+	
+	send(sockfd, send_buf, strlen(send_buf), 0);
+	
+	nbyte_recvd = recv(sockfd, recv_buf, BUFSIZE, 0);
+		recv_buf[nbyte_recvd] = '\0';
+
+	if (strcmp(recv_buf,"ok")){
+		printf("ERROR: %s\n", recv_buf);
+		exit(1);
+	}
+
+	printf("OK: %s\n", recv_buf);
+
+
+	fflush(stdout);
 
 	return (0);
 }
@@ -158,7 +178,20 @@ main(int argc, char *argv[])
 	} else
 		strcpy(user.name, argv[1]);
 
-	ret = auth(user);
+	
+
+	ret = connect_request(&sockfd, &server_addr);
+	if (ret)
+		exit(1);
+
+
+	FD_ZERO(&master);
+	FD_ZERO(&read_fds);
+	FD_SET(0, &master);
+	FD_SET(sockfd, &master);
+	fdmax = sockfd + 1;
+
+	ret = auth(user, sockfd);
 	if (ret) {
 		printf("\nERROR: authentication error\n");
 		return (401);
@@ -166,16 +199,6 @@ main(int argc, char *argv[])
 
 	printf("\n\nWellcome to Room #(%s) \n\n", user.room);
 	fflush(stdout);
-
-	ret = connect_request(&sockfd, &server_addr);
-	if (ret)
-		exit(1);
-
-	FD_ZERO(&master);
-	FD_ZERO(&read_fds);
-	FD_SET(0, &master);
-	FD_SET(sockfd, &master);
-	fdmax = sockfd + 1;
 
 	while (1) {
 		//printf("$> ");

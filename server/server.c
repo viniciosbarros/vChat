@@ -21,6 +21,7 @@ Server vChat - servidor Chat messages
 #include <syslog.h>
 #include <signal.h>
 #include <event.h>
+/*#include <sqlite3.h>*/
 
 #include "log.h"
 #include "server.h"
@@ -50,7 +51,6 @@ set_nonblock(int *fd)
 
 	return (0);
 }
-
 
 static void
 connection_accept(int fd, short event, void *bula)

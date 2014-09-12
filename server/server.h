@@ -11,6 +11,8 @@ Server vChat - servidor Chat messages
 
 #include <sys/queue.h>
 
+#define WORD	32
+
 extern TAILQ_HEAD(CLIST, client) client_list;
 
 struct client {
@@ -20,6 +22,9 @@ struct client {
 	struct		bufferevent *cl_buf_ev;
 	struct		event cl_ev_read;
 	struct		event cl_ev_write;
+
+	char name[WORD];
+	char passwd[WORD];
 };
 
 struct server_ctx {
