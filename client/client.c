@@ -162,7 +162,7 @@ main(int argc, char *argv[])
 	struct sockaddr_in server_addr;
 	fd_set master, read_fds;
 	struct User user;
-	strncpy(user.room, "Default", 7);
+	strncpy(user.room, "Default", 8);
 
 	if (argc < 2) {
 		getlogin_r(user.name, sizeof(user.name));
@@ -171,10 +171,10 @@ main(int argc, char *argv[])
 			    ("\nNO user informed: Using system's username: %s\n",
 			    user.name);
 	} else if (argc == 3 || argc > 3) {
-		strncpy(user.room, argv[2], sizeof(argv[2]));
-		strncpy(user.name, argv[1], sizeof(argv[1]));
+		strncpy(user.room, argv[2], (sizeof(argv[2])+1));
+		strncpy(user.name, argv[1], (sizeof(argv[1])+1));
 	} else
-		strncpy(user.name, argv[1], sizeof(argv[1]));
+		strncpy(user.name, argv[1], (sizeof(argv[1])+1));
 
 	
 
