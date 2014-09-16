@@ -2,21 +2,21 @@
 	Client vChat
 	By vinicios Jul 2014
 */
-
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <err.h>
 
 #define BUFSIZE 2048
-#define WORD 32
+#define WORD 128
 #define SERVER_IP "127.0.0.1"	//Local Server Address
 #define PORT 9055
 
@@ -46,22 +46,20 @@ auth(struct User user, int sockfd)
 	system("stty -echo");
 	gets(pass);
 	system("stty echo");
-	strcpy(user.passwd, pass);
+	strncpy(user.passwd, pass, sizeof(pass));
 
-	sprintf(send_buf, "/connect %s %s", user.name, user.passwd);
-	
+	sprintf(send_buf, "/connect %s %s", user.name, user.passwd);	
 	send(sockfd, send_buf, strlen(send_buf), 0);
 	
 	nbyte_recvd = recv(sockfd, recv_buf, BUFSIZE, 0);
-		recv_buf[nbyte_recvd] = '\0';
+	recv_buf[nbyte_recvd] = '\0';
 
-	if (strcmp(recv_buf,"ok")){
-		printf("ERROR: %s\n", recv_buf);
-		exit(1);
+	if (strcmp(recv_buf,"ok")) {
+		printf("\nERROR: can't authenticate code(%s)\n", recv_buf);
+		exit (1);
 	}
 
-	printf("OK: %s\n", recv_buf);
-
+	printf("\nOK: %s\n", recv_buf);
 
 	fflush(stdout);
 
@@ -72,9 +70,9 @@ int
 cmd_prompt(struct User user)
 {
 	printf("client-quited\n");
-//      strcpy(send_buf,user.name);
+//      strncpy(send_buf,user.name,sizeof(user.name));
 //      send(sockfd, send_buf, strlen(send_buf), 0);
-	return 0;
+	return (0);
 }
 
 void
@@ -86,7 +84,7 @@ close_session(struct User user, int sockfd)
 	sprintf(send_buf, "%s : User %s has left the room %s",
 	    user.room, user.name, user.room);
 
-	send(sockfd, send_buf, strlen(send_buf), 0);
+	send (sockfd, send_buf, strlen(send_buf), 0);
 
 }
 
@@ -129,7 +127,7 @@ send_recv(int i, int sockfd, struct User user)
 		if (!(strcmp(room, user.room)))
 			printf("%s\n", recv_buf);
 
-		fflush(stdout);
+		fflush (stdout);
 	}
 }
 
@@ -164,7 +162,7 @@ main(int argc, char *argv[])
 	struct sockaddr_in server_addr;
 	fd_set master, read_fds;
 	struct User user;
-	strcpy(user.room, "Default");
+	strncpy(user.room, "Default", 7);
 
 	if (argc < 2) {
 		getlogin_r(user.name, sizeof(user.name));
@@ -173,16 +171,16 @@ main(int argc, char *argv[])
 			    ("\nNO user informed: Using system's username: %s\n",
 			    user.name);
 	} else if (argc == 3 || argc > 3) {
-		strcpy(user.room, argv[2]);
-		strcpy(user.name, argv[1]);
+		strncpy(user.room, argv[2], sizeof(argv[2]));
+		strncpy(user.name, argv[1], sizeof(argv[1]));
 	} else
-		strcpy(user.name, argv[1]);
+		strncpy(user.name, argv[1], sizeof(argv[1]));
 
 	
 
 	ret = connect_request(&sockfd, &server_addr);
 	if (ret)
-		exit(1);
+		exit (1);
 
 
 	FD_ZERO(&master);
@@ -201,17 +199,16 @@ main(int argc, char *argv[])
 	fflush(stdout);
 
 	while (1) {
-		//printf("$> ");
 		read_fds = master;
 		if (select(fdmax, &read_fds, NULL, NULL, NULL) == -1) {
 			perror("select");
-			exit(4);
+			exit (4);
 		}
 
 		for (i = 0; i <= fdmax; i++)
 			if (FD_ISSET(i, &read_fds))
 				send_recv(i, sockfd, user);
 	}
-	close(sockfd);
+	close (sockfd);
 	return 0;
 }

@@ -5,7 +5,7 @@ CFLAGS	+= -Wmissing-declarations -Wshadow
 CFLAGS	+= -Wpointer-arith -Wcast-qual
 CFLAGS	+= -Wsign-compare
 
-LDFLAGS	+= -levent
+LDFLAGS	+= -levent -lsqlite3
 
 PROG	= server
 

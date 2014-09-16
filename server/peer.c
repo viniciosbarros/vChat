@@ -33,15 +33,15 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 	buf[dlen] = 0;
 
 	log_debug("MSG: %s\n",buf);
-	if(buf[0] == '/'){
+	if (buf[0] == '/') {
 		log_debug("string is a CMD: %s\n",buf);
 		ret = command(buf, c);
-		if(ret)
-			strcpy(buf,"ok");
+		if(ret == 1)
+			strncpy(buf,"ok",dlen);
 	}
 
 	response(bufev, c, buf, dlen, ret);
-		
+
 }
 
 void
@@ -50,11 +50,7 @@ peer_error_cb(struct bufferevent *bufev, short what, void *bula)
 	struct client *c = bula;
 
 	log_debug("Client: %d disconnected by remote\n", c->cl_fd);
-	bufferevent_disable(bufev, EV_READ);
-	bufferevent_free(bufev);
-	close(c->cl_fd);
-
-	TAILQ_REMOVE(&sc.sc_clist, c, cl_entries);
+	remove_client(bufev, c);
 	free(c);
 }
 
@@ -64,6 +60,7 @@ void remove_client(struct bufferevent *bufev, struct client *c)
 	bufferevent_free(bufev);
 	close(c->cl_fd);
 	TAILQ_REMOVE(&sc.sc_clist, c, cl_entries);
+	log_debug("Client: %d hit the ground\n", c->name);
 	return;
 }
 
