@@ -1,88 +1,108 @@
+/*
+ * Copyright (c) 2014 Vinicios Barros <vinicios.barros@ieee.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <string.h>
 
 #include <event.h>
 
+#include "cmd.h"
 #include "log.h"
 #include "server.h"
-#include "cmd.h"
 
-static void remove_client(struct bufferevent *, struct client*);
-static void response(struct bufferevent *, struct client*, 
-	char *, size_t, int);
+
+static void remove_client(struct client *);
+static void response(struct client *, const char *, size_t, int);
 
 void
 peer_read_cb(struct bufferevent *bufev, void *bula)
 {
-	struct client *c = bula;
+	struct client *cl = bula;
 	size_t dlen;
 	char buf[512];
 	int ret = 0;
 
 	dlen = bufferevent_read(bufev, buf, sizeof(buf));
 	if (dlen == 0) {
-		log_debug("Client: %d disconnected by remote\n", c->cl_fd);
-		remove_client(bufev, c);
-		free(c);
+		log_debug("Client: %d disconnected by remote\n", cl->cl_fd);
+		remove_client(cl);
+		free(cl);
 		return;
 	}
 
 	buf[dlen] = 0;
 
-	log_debug("MSG: %s\n",buf);
+	log_debug("MSG: %s\n", buf);
 	if (buf[0] == '/') {
-		log_debug("string is a CMD: %s\n",buf);
-		ret = command(buf, c);
-		if(ret == 1)
-			strncpy(buf,"ok",dlen);
+		log_debug("string is a CMD: %s\n", buf);
+		ret = command(buf, cl);
+		if (ret == 1)
+			strncpy(buf, "ok", dlen);
 	}
 
-	response(bufev, c, buf, dlen, ret);
+	response(cl, buf, dlen, ret);
 
 }
 
 void
 peer_error_cb(struct bufferevent *bufev, short what, void *bula)
 {
-	struct client *c = bula;
+	struct client *cl = bula;
 
-	log_debug("Client: %d disconnected by remote\n", c->cl_fd);
-	remove_client(bufev, c);
-	free(c);
+	log_debug("Client: %d disconnected by remote\n", cl->cl_fd);
+	remove_client(cl);
+
 }
 
-void remove_client(struct bufferevent *bufev, struct client *c)
+static void 
+remove_client(struct client *cl)
 {
-	bufferevent_disable(bufev, EV_READ);
-	bufferevent_free(bufev);
-	close(c->cl_fd);
-	TAILQ_REMOVE(&sc.sc_clist, c, cl_entries);
-	log_debug("Client: %d hit the ground\n", c->name);
-	return;
+	bufferevent_disable(cl->cl_bufev, EV_READ);
+	bufferevent_free(cl->cl_bufev);
+
+	close(cl->cl_fd);
+
+	TAILQ_REMOVE(&sc.sc_clist, cl, cl_entries);
+
+	free(cl);
+
 }
 
-void response(struct bufferevent *bufev, 
-			struct client *c,  char buf[], 
-			size_t dlen, int dest)
+static void 
+response(struct client *cl, const char *buf, size_t dlen, int dest)
 {
 
-	struct client *client;
+	struct client *cln;
 
 	/* In case buf was a command response*/
-	if(dest){
-		bufferevent_write(c->cl_buf_ev, buf, dlen);
+	if (dest) {
+		bufferevent_write(cl->cl_bufev, buf, dlen);
+
 		return;		
 	}
 
 	/* In case buf was a message to all*/	
-	TAILQ_FOREACH(client, &sc.sc_clist, cl_entries) {
-		if (client == c)
+	TAILQ_FOREACH(cln, &sc.sc_clist, cl_entries) {
+		if (cln == cl)
 			continue;
 
-		bufferevent_write(client->cl_buf_ev, buf, dlen);
+		bufferevent_write(cln->cl_bufev, buf, dlen);
 	}
 
 }

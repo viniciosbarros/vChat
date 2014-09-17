@@ -1,27 +1,35 @@
 /*
+ * Copyright (c) 2014 Vinicios Barros <vinicios.barros@ieee.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
 
-by vinicios - July 2014
-
-Server vChat - servidor Chat messages
-
-*/
-
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include <err.h>
+#include <fcntl.h>
 #include <netdb.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <syslog.h>
-#include <signal.h>
+#include <unistd.h>
+
 #include <event.h>
-/*#include <sqlite3.h>*/
 
 #include "log.h"
 #include "server.h"
@@ -33,23 +41,21 @@ Server vChat - servidor Chat messages
 struct server_ctx sc;
 
 static void usage(void);
-static int  set_nonblock(int *);
+static void set_nonblock(int);
 static void connection_accept(int, short, void *);
-static void connect_request(int *);
+static int connect_request(void);
 
-int
-set_nonblock(int *fd)
+static void
+set_nonblock(int fd)
 {
 	int flags;
 
-	flags = fcntl(*fd, F_GETFL);
+	flags = fcntl(fd, F_GETFL);
 	if (flags == -1)
-		return (flags);
+		fatal("F_GETFL");
 	flags |= O_NONBLOCK;
-	if (fcntl(*fd, F_SETFL, flags) == -1)
-		return (-1);
-
-	return (0);
+	if (fcntl(fd, F_SETFL, flags) == -1)
+		fatal("F_SETFL");
 }
 
 static void
@@ -77,22 +83,23 @@ connection_accept(int fd, short event, void *bula)
 	c->cl_fd = newsockfd;
 	TAILQ_INSERT_HEAD(&sc.sc_clist, c, cl_entries);
 
-	c->cl_buf_ev = bufferevent_new(c->cl_fd, peer_read_cb, NULL, peer_error_cb, c);
- 	bufferevent_enable(c->cl_buf_ev, EV_READ);
+	c->cl_bufev = bufferevent_new(c->cl_fd, peer_read_cb, NULL, peer_error_cb, c);
+ 	bufferevent_enable(c->cl_bufev, EV_READ);
 
 	log_debug("Connection established with %s on port %d\n",
 	     inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
 
 }
 
-static void
-connect_request(int *sockfd)
+static int
+connect_request(void)
 {
 	int yes = 1;
+	int sockfd;
 	struct sockaddr_in sin;
 
-	*sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (*sockfd == -1)
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd == -1)
 		err(1, "socket");
 
 	memset(&sin, 0, sizeof(sin));
@@ -100,35 +107,26 @@ connect_request(int *sockfd)
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons(PORT);
 
-	if (bind(*sockfd, (struct sockaddr *) &sin, 
+	if (bind(sockfd, (struct sockaddr *) &sin, 
 		sizeof(sin)) == -1) {
-		close(*sockfd);
+		close(sockfd);
 		err(1, "bind");
 	}
 
-	if (setsockopt(*sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
 	    sizeof(int)) == -1) {
-		close(*sockfd);
+		close(sockfd);
 		err(2, "setsockopt");
 	}
 
-	if (listen(*sockfd, 10) == -1) {
-		close(*sockfd);
+	if (listen(sockfd, 10) == -1) {
+		close(sockfd);
 		err(3, "listen");
 	}
 
-	if (set_nonblock(sockfd) == -1) {
-		close(*sockfd);
-		err(4, "change to non-block");
-	}
+	set_nonblock(sockfd);
 
-	event_set(&sc.sc_acceptev, *sockfd, EV_READ | EV_PERSIST,
-	    connection_accept, NULL);
-	event_add(&sc.sc_acceptev, NULL);
-
-	event_dispatch();
-
-	/* NOTREACHED */
+	return (sockfd);
 }
 
 static void
@@ -149,7 +147,7 @@ main(int argc, char *argv[])
 {
 	int	sockfd;
 	int	ch;
-	uint32_t opts;
+	uint32_t opts = 0;
 
 #define OPTS_FOREGROUND	(1UL << 0)
 #define OPTS_VERBOSE	(1UL << 1)
@@ -183,7 +181,13 @@ main(int argc, char *argv[])
 
 	TAILQ_INIT(&sc.sc_clist);
 
-	connect_request(&sockfd);
+	sockfd = connect_request();
+
+	event_set(&sc.sc_acceptev, sockfd, EV_READ | EV_PERSIST,
+	    connection_accept, NULL);
+	event_add(&sc.sc_acceptev, NULL);
+
+	event_dispatch();
 
 	exit(EXIT_SUCCESS);
 }
