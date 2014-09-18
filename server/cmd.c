@@ -34,15 +34,9 @@
 #include <unistd.h>
 
 #include <event.h>
-#include <sqlite3.h>
 
 #include "log.h"
 #include "server.h"
-
-#define CMD_DATABASE 		"/var/opt/banco.db"
-#define CMD_WORD			128
-#define CMD_NOT_AUTHORIZED	5
-#define CMD_AUTHORIZED 		1
 
 sqlite3 *passwd_db = NULL;
 
@@ -101,13 +95,10 @@ check_passwd(const char * user, const char *pass)
 	if (passwd_db == NULL)
 		passwd_db = open_database();
 
-	if (sqlite3_prepare_v2(passwd_db, sql, strlen (sql) + 1, &res, &tail) 
-		!= SQLITE_OK) {
-		log_debug("can't retrieve data: %s\n", sqlite3_errmsg(passwd_db));
-		return (CMD_NOT_AUTHORIZED);
-	}
+	CALL_SQLITE (prepare_v2(passwd_db, sql, strlen (sql) + 1,
+		&res, &tail));
 
-	sqlite3_bind_text(res, 1, user, strlen (user), 0);
+	CALL_SQLITE (bind_text(res, 1, user, strlen (user), 0));
 
 	while (sqlite3_step(res) == SQLITE_ROW) {
 		tmp_pass = (const char *) sqlite3_column_text(res, 1);

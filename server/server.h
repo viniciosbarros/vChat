@@ -17,18 +17,28 @@
 #ifndef _SERVER_H_
 #define _SERVER_H_
 
-/*
-
-by vinicios - July 2014
-
-Server vChat - servidor Chat messages
-
-*/
-
 #include <sys/queue.h>
+#include <sqlite3.h>
+#include "log.h"
 
-#define WORD	32
-#define CLOSE_CONNECTION 5
+#define WORD				32
+#define CLOSE_CONNECTION 	5
+
+#define CMD_DATABASE 		"/var/opt/banco.db"
+#define CMD_WORD			128
+#define CMD_NOT_AUTHORIZED	5
+#define CMD_AUTHORIZED 		1
+
+#define CALL_SQLITE(f)											\
+	{															\
+		int i;													\
+		i = sqlite3_ ## f;										\
+		if (i != SQLITE_OK) {									\
+			log_debug ("%s failed with status %d: %s \n", #f, i,\
+				sqlite3_errmsg(passwd_db));						\
+				return (CMD_NOT_AUTHORIZED);					\
+		}														\
+	}															\
 
 struct client {
 	TAILQ_ENTRY(client) cl_entries;
