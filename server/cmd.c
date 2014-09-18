@@ -44,8 +44,11 @@
 #define CMD_NOT_AUTHORIZED	5
 #define CMD_AUTHORIZED 		1
 
+sqlite3 *passwd_db = NULL;
+
 static void matche(const char *, const char *, ...);
 static int check_passwd(const char *, const char *);
+static sqlite3 * open_database(void);
 
 int 
 command(const char *buf, struct client *cl)
@@ -87,43 +90,46 @@ matche(const char * str, const char * format, ...)
 static int 
 check_passwd(const char * user, const char *pass)
 {
-	sqlite3 *db;
- 	sqlite3_stmt *res;
-  	const char *tail;
-  	const char *tmp_nick;
-  	const char *tmp_pass;
-  	int ret = CMD_NOT_AUTHORIZED;
+	sqlite3_stmt *res;
+	const char *tail;
+	const char *tmp_pass;
+	int ret = CMD_NOT_AUTHORIZED;
+	char *sql;
+	sql = "SELECT * FROM USERS WHERE NICK LIKE ?";
 
-  	if (sqlite3_open(CMD_DATABASE, &db)) {
-    	sqlite3_close(db); /* never close */
-    	log_debug("can't open database: %s\n", sqlite3_errmsg(db));
-    	return (CMD_NOT_AUTHORIZED);
-    }
 
-    /* query the database for all users and passwd */
-    /* TODO: match only the specific user in the database */
-    if (sqlite3_prepare_v2(db, "SELECT NICK,PASSWD FROM USERS WHERE NICK like ?;",
-    		CMD_WORD, &res, &tail) != SQLITE_OK) {
-    	sqlite3_close(db);
-    	log_debug("can't retrieve data: %s\n", sqlite3_errmsg(db));
-    	return (CMD_NOT_AUTHORIZED);
-  	}
+	if (passwd_db == NULL)
+		passwd_db = open_database();
 
-  	/* search for all obtained user for the specific one*/
-  	while (sqlite3_step(res) == SQLITE_ROW) {
-  		tmp_nick = (const char *) sqlite3_column_text(res, 0);
-  		tmp_pass = (const char *) sqlite3_column_text(res, 1);
-  		if (!strcmp(tmp_nick,user)) {
-  			if (!strcmp(tmp_pass,pass)){
-  				log_debug("USER: (%s) is authenticated",tmp_nick);
-        		ret = CMD_AUTHORIZED;
-        	}
-    	}
-  	}
+	if (sqlite3_prepare_v2(passwd_db, sql, strlen (sql) + 1, &res, &tail) 
+		!= SQLITE_OK) {
+		log_debug("can't retrieve data: %s\n", sqlite3_errmsg(passwd_db));
+		return (CMD_NOT_AUTHORIZED);
+	}
 
-  	sqlite3_finalize(res);
-  	sqlite3_close(db);
+	sqlite3_bind_text(res, 1, user, strlen (user), 0);
+
+	while (sqlite3_step(res) == SQLITE_ROW) {
+		tmp_pass = (const char *) sqlite3_column_text(res, 1);
+		if (strcmp(tmp_pass,pass) == 0) {
+			log_debug("USER: (%s) is authenticated",user);
+			ret = CMD_AUTHORIZED;
+		}
+	}
+
+	sqlite3_reset(res);
 
 	log_debug("auth_code_resp(%d) \n", ret);
 	return (ret);
+}
+
+static sqlite3 *
+open_database(void)
+{
+
+	if (sqlite3_open(CMD_DATABASE, &passwd_db)) {
+		log_debug("can't open database: %s\n", sqlite3_errmsg(passwd_db));
+	}
+
+	return (passwd_db);
 }

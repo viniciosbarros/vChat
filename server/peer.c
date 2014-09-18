@@ -22,7 +22,6 @@
 
 #include <event.h>
 
-#include "cmd.h"
 #include "log.h"
 #include "server.h"
 
