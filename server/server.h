@@ -22,19 +22,22 @@
 #include "log.h"
 
 #define WORD				32
+#define PEER_MSG			2048 
 #define CLOSE_CONNECTION 	5
 
 #define CMD_DATABASE 		"/var/opt/banco.db"
 #define CMD_WORD			128
 #define CMD_NOT_AUTHORIZED	5
 #define CMD_AUTHORIZED 		1
+#define CMD_RESPONSE 		1
+#define CMD_DIRECT_RESPONSE	2
 
 #define CALL_SQLITE(f)											\
 	{															\
 		int i;													\
 		i = sqlite3_ ## f;										\
 		if (i != SQLITE_OK) {									\
-			log_debug ("%s failed with status %d: %s \n", #f, i,\
+			log_debug ("%s failed with status %d: %s\n", #f, i, \
 				sqlite3_errmsg(passwd_db));						\
 				return (CMD_NOT_AUTHORIZED);					\
 		}														\
@@ -43,13 +46,14 @@
 struct client {
 	TAILQ_ENTRY(client) cl_entries;
 
-	int		cl_fd;
+	int			cl_fd;
 	struct		bufferevent *cl_bufev;
 	struct		event cl_readev;
 	struct		event cl_writeev;
 
-	char cl_name[WORD];
-	char cl_passwd[WORD];
+	char 		cl_name[WORD];
+	char 		cl_passwd[WORD];
+	char 		cl_room[WORD];
 };
 
 struct server_ctx {
@@ -63,6 +67,6 @@ extern struct server_ctx sc;
 void peer_read_cb(struct bufferevent *, void *);
 void peer_error_cb(struct bufferevent *, short, void *);
 
-int	command(const char *, struct client *);
+int	command(const char *, struct client *, char *);
 
 #endif /* _SERVER_H_ */

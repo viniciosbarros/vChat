@@ -38,35 +38,46 @@
 #include "log.h"
 #include "server.h"
 
-sqlite3 *passwd_db = NULL;
+static sqlite3 *passwd_db = NULL;
 
 static void matche(const char *, const char *, ...);
 static int check_passwd(const char *, const char *);
 static sqlite3 * open_database(void);
+static int private_message(const char *);
 
 int 
-command(const char *buf, struct client *cl)
+command(const char *buf, struct client *cl, char * cmd)
 {
-	char cmd[WORD];
 	char user[WORD];
 	char pass[WORD];
+	char room[WORD];
 	int ret = 0;
 
 	matche(buf, "%s", cmd);
 	log_debug("CMD is: %s\n",cmd);
 	
 	if (strcmp(cmd,"/connect") == 0) {
-		matche(buf, "%s %s %s", cmd, user, pass);
+		matche(buf, "%s %s %s %s", cmd, user, pass, room);
 		log_debug("USER %s is trying to %s: with pass %s\n", 
 			user, cmd, pass);
 		ret = check_passwd(user, pass);
 		strncpy(cl->cl_name, user, sizeof(user));
+		strncpy(cl->cl_room, room, sizeof(room));
 		return (ret);
 	}
 
 	if (strcmp(cmd,"/quit") == 0) {
 		log_debug("USER is trying to %s", cmd);
 		return (CLOSE_CONNECTION);
+	}
+
+	if (strcmp(cmd,"/secret") == 0) {
+		matche(buf, "%s %s", cmd, user);
+		log_debug("USER %s is trying to say a secret to %s\n", 
+			cl->cl_name, user);
+		ret = private_message(buf);
+		strncpy(cmd, user, sizeof(user));
+		return (ret);
 	}
 
 	return (ret);
@@ -81,6 +92,12 @@ matche(const char * str, const char * format, ...)
 	va_end(args);
 }
 
+static int
+private_message(const char * buf)
+{
+	return (2);
+}
+
 static int 
 check_passwd(const char * user, const char *pass)
 {
@@ -92,10 +109,9 @@ check_passwd(const char * user, const char *pass)
 	sql = "SELECT * FROM USERS WHERE NICK LIKE ?";
 
 
-	if (passwd_db == NULL)
-		passwd_db = open_database();
+	passwd_db = open_database();
 
-	CALL_SQLITE (prepare_v2(passwd_db, sql, strlen (sql) + 1,
+	CALL_SQLITE (prepare_v2(passwd_db, sql, strlen (sql),
 		&res, &tail));
 
 	CALL_SQLITE (bind_text(res, 1, user, strlen (user), 0));
@@ -118,9 +134,12 @@ static sqlite3 *
 open_database(void)
 {
 
-	if (sqlite3_open(CMD_DATABASE, &passwd_db)) {
-		log_debug("can't open database: %s\n", sqlite3_errmsg(passwd_db));
-	}
+	if (passwd_db != NULL)
+		return (passwd_db);
+	
+	if (sqlite3_open(CMD_DATABASE, &passwd_db))
+		log_debug("can't open database: %s\n",
+			sqlite3_errmsg(passwd_db));
 
 	return (passwd_db);
 }

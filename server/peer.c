@@ -27,7 +27,7 @@
 
 
 static void remove_client(struct client *);
-static void response(struct client *, const char *, size_t, int);
+static void response(struct client *, const char *, size_t, int, char *);
 
 void
 peer_read_cb(struct bufferevent *bufev, void *bula)
@@ -35,6 +35,7 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 	struct client *cl = bula;
 	size_t dlen;
 	char buf[512];
+	char cmd[WORD];
 	int ret = 0;
 
 	dlen = bufferevent_read(bufev, buf, sizeof(buf));
@@ -50,12 +51,12 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 	log_debug("MSG: %s\n", buf);
 	if (buf[0] == '/') {
 		log_debug("string is a CMD: %s\n", buf);
-		ret = command(buf, cl);
-		if (ret == 1)
+		ret = command(buf, cl, cmd);
+		if (ret == 1 && (strcmp(cmd,"/connect")==0))
 			strncpy(buf, "ok", dlen);
 	}
 
-	response(cl, buf, dlen, ret);
+	response(cl, buf, dlen, ret, cmd);
 
 }
 
@@ -84,19 +85,35 @@ remove_client(struct client *cl)
 }
 
 static void 
-response(struct client *cl, const char *buf, size_t dlen, int dest)
+response(struct client *cl, const char *buf, size_t dlen, 
+	int dest, char *dst_name)
 {
 
 	struct client *cln;
+	char snd_buf[PEER_MSG];
+	int sn_size;
 
 	/* In case buf was a command response*/
-	if (dest) {
+	if (dest == CMD_RESPONSE) {
 		bufferevent_write(cl->cl_bufev, buf, dlen);
 
 		return;		
 	}
 
-	/* In case buf was a message to all*/	
+	/*In case buf was a private message*/
+	if (dest == CMD_DIRECT_RESPONSE){
+		TAILQ_FOREACH(cln, &sc.sc_clist, cl_entries) {
+			if (strcmp(cln->cl_name, dst_name) == 0){
+			sn_size = snprintf(snd_buf, PEER_MSG, "%s room: (%s) %s",
+				cln->cl_room, cl->cl_name, buf);
+			bufferevent_write(cln->cl_bufev, snd_buf, sn_size);
+			
+			return;
+			}
+		}
+	}
+
+	/* In case buf was a message to all (regular flow)*/
 	TAILQ_FOREACH(cln, &sc.sc_clist, cl_entries) {
 		if (cln == cl)
 			continue;

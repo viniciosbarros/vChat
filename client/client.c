@@ -41,7 +41,7 @@ struct User
 };
 
 int auth(struct User, int);
-int cmd_prompt(struct User);
+int cmd_prompt(struct User, char *, int);
 void close_session(struct User,int);
 void send_recv(int, int,struct User);
 int connect_request(int*, struct sockaddr_in*);
@@ -53,6 +53,7 @@ auth(struct User user, int sockfd)
 	char send_buf[BUFSIZE];
 	char recv_buf[BUFSIZE];
 	int nbyte_recvd;
+	int sn_bytes;
 
 	printf("%s vChat(%s) password: ", user.name, SERVER_IP);
 	system("stty -echo");
@@ -60,8 +61,8 @@ auth(struct User user, int sockfd)
 	system("stty echo");
 	strncpy(user.passwd, pass, sizeof(pass));
 
-	sprintf(send_buf, "/connect %s %s", user.name, user.passwd);	
-	send(sockfd, send_buf, strlen(send_buf), 0);
+	sn_bytes = sprintf(send_buf, "/connect %s %s %s", user.name, user.passwd, user.room);	
+	send(sockfd, send_buf, sn_bytes, 0);
 	
 	nbyte_recvd = recv(sockfd, recv_buf, BUFSIZE, 0);
 	recv_buf[nbyte_recvd] = '\0';
@@ -79,11 +80,11 @@ auth(struct User user, int sockfd)
 }
 
 int
-cmd_prompt(struct User user)
+cmd_prompt(struct User user, char * send_buf, int sockfd)
 {
-	printf("client-quited\n");
-//      strncpy(send_buf,user.name,sizeof(user.name));
-//      send(sockfd, send_buf, strlen(send_buf), 0);
+	/*printf("client-quited\n");
+    strncpy(send_buf,user.name,sizeof(user.name));*/
+    send(sockfd, send_buf, strlen(send_buf), 0);
 	return (0);
 }
 
@@ -111,24 +112,25 @@ send_recv(int i, int sockfd, struct User user)
 	char stime[WORD];
 	time_t rawtime;
 	struct tm *timeinfo;
+	int sn_bytes;
 
 	if (i == 0) {
 		fgets(message_str, BUFSIZE, stdin);
 		if (!(strcmp(message_str, "/quit\n"))) {
 			close_session(user, sockfd);
 			exit(0);
-		} else if (!(strcmp(message_str, "/cmd\n"))) {
-			cmd_prompt(user);
-			exit(0);
+		} else if (message_str[0] == '/') {
+			cmd_prompt(user, message_str, sockfd);
 		} else {
 
 			time(&rawtime);
 			timeinfo = localtime(&rawtime);
 			strftime(stime, sizeof(stime), "%H:%M:%S", timeinfo);
 
-			sprintf(send_buf, "%s room: (%s) (%s): %s",
+			sn_bytes = sprintf(send_buf, "%s room: (%s) (%s): %s",
 			    user.room, user.name, stime, message_str);
-			send(sockfd, send_buf, strlen(send_buf), 0);
+			send_buf[sn_bytes] = '\0';
+			send(sockfd, send_buf, sn_bytes, 0);
 		}
 	} else {
 		nbyte_recvd = recv(sockfd, recv_buf, BUFSIZE, 0);
