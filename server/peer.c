@@ -34,8 +34,8 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 {
 	struct client *cl = bula;
 	size_t dlen;
-	char buf[512];
-	char cmd[WORD];
+	char buf[PEER_MSG];
+	char handler[WORD];
 	int ret = 0;
 
 	dlen = bufferevent_read(bufev, buf, sizeof(buf));
@@ -48,15 +48,20 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 
 	buf[dlen] = 0;
 
-	log_debug("MSG: %s\n", buf);
 	if (buf[0] == '/') {
-		log_debug("string is a CMD: %s\n", buf);
-		ret = command(buf, cl, cmd);
-		if (ret == 1 && (strcmp(cmd,"/connect")==0))
+		log_debug("command received: %s\n", buf);
+		ret = command(buf, cl, handler);
+		log_debug("ret: %d\n", ret);
+		if (ret == CMD_AUTHORIZED && (strcmp(handler,"/connect")==0))
 			strncpy(buf, "ok", dlen);
+		if (ret == CMD_NOT_AUTHORIZED && (strcmp(handler,"/connect")==0)) {
+			strncpy(buf, "nok", dlen);
+			ret = CMD_RESPONSE;
+		}
 	}
 
-	response(cl, buf, dlen, ret, cmd);
+	log_debug("RESPONSE: %s - %s - %d\n", buf, handler, ret);
+	response(cl, buf, dlen, ret, handler);
 
 }
 
@@ -91,29 +96,32 @@ response(struct client *cl, const char *buf, size_t dlen,
 
 	struct client *cln;
 	char snd_buf[PEER_MSG];
-	int sn_size;
+	size_t sn_size;
 
-	/* In case buf was a command response*/
+
+	log_debug("RESPONSE-1: %d %s %s\n", dest, buf, dst_name);
+
+	/* In case buf was a command response */
 	if (dest == CMD_RESPONSE) {
 		bufferevent_write(cl->cl_bufev, buf, dlen);
 
 		return;		
 	}
 
-	/*In case buf was a private message*/
+	/* In case buf was a private message */
 	if (dest == CMD_DIRECT_RESPONSE){
 		TAILQ_FOREACH(cln, &sc.sc_clist, cl_entries) {
-			if (strcmp(cln->cl_name, dst_name) == 0){
-			sn_size = snprintf(snd_buf, PEER_MSG, "%s room: (%s) %s",
-				cln->cl_room, cl->cl_name, buf);
-			bufferevent_write(cln->cl_bufev, snd_buf, sn_size);
-			
-			return;
+			if (strcmp(cln->cl_name, dst_name) == 0) {
+				sn_size = snprintf(snd_buf, PEER_MSG, "%s room: (%s) %s",
+					cln->cl_room, cl->cl_name, buf);
+				bufferevent_write(cln->cl_bufev, snd_buf, sn_size);
+
+				return;
 			}
 		}
 	}
 
-	/* In case buf was a message to all (regular flow)*/
+	/* In case buf was a message to all (regular flow) */
 	TAILQ_FOREACH(cln, &sc.sc_clist, cl_entries) {
 		if (cln == cl)
 			continue;

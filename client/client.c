@@ -27,10 +27,11 @@
 #include <time.h>
 #include <err.h>
 
-#define BUFSIZE 2048
-#define WORD 128
-#define SERVER_IP "127.0.0.1"	//Local Server Address
-#define PORT 9055
+#define BUFSIZE 	2048
+#define WORD 		128
+#define SERVER_IP 	"127.0.0.1"	//Local Server Address
+#define PORT 		9055
+#define SEND		0
 
 struct User
 {
@@ -40,22 +41,22 @@ struct User
 	char room[WORD];
 };
 
-int auth(struct User, int);
-int cmd_prompt(struct User, char *, int);
-void close_session(struct User,int);
-void send_recv(int, int,struct User);
-int connect_request(int*, struct sockaddr_in*);
+static int 	auth(struct User, int);
+static int 	cmd_prompt(struct User, char *, int);
+static void	close_session(struct User,int);
+static void	send_recv(int, int,struct User);
+static int 	connect_request(int*, struct sockaddr_in*);
+static void 	curse_operator(void);
 
-int
+static int
 auth(struct User user, int sockfd)
 {
 	char pass[WORD];
 	char send_buf[BUFSIZE];
 	char recv_buf[BUFSIZE];
-	int nbyte_recvd;
 	int sn_bytes;
 
-	printf("%s vChat(%s) password: ", user.name, SERVER_IP);
+	printf("%s vChat(%s)\npassword:", user.name, SERVER_IP);
 	system("stty -echo");
 	gets(pass);
 	system("stty echo");
@@ -64,31 +65,31 @@ auth(struct User user, int sockfd)
 	sn_bytes = sprintf(send_buf, "/connect %s %s %s", user.name, user.passwd, user.room);	
 	send(sockfd, send_buf, sn_bytes, 0);
 	
-	nbyte_recvd = recv(sockfd, recv_buf, BUFSIZE, 0);
-	recv_buf[nbyte_recvd] = '\0';
+	recv(sockfd, recv_buf, BUFSIZE, 0);
 
-	if (strcmp(recv_buf,"ok")) {
-		printf("\nERROR: can't authenticate code(%s)\n", recv_buf);
+	if (strcmp(recv_buf,"ok") != 0) {
+		printf("\n\tCan't authenticate\n");
+		curse_operator();
 		exit (1);
 	}
 
-	printf("\nOK: %s\n", recv_buf);
+	printf("\nAuthentication: %s\n", recv_buf);
 
 	fflush(stdout);
 
 	return (0);
 }
 
-int
+static int
 cmd_prompt(struct User user, char * send_buf, int sockfd)
 {
-	/*printf("client-quited\n");
-    strncpy(send_buf,user.name,sizeof(user.name));*/
-    send(sockfd, send_buf, strlen(send_buf), 0);
+
+	send(sockfd, send_buf, strlen(send_buf), 0);
 	return (0);
+
 }
 
-void
+static void
 close_session(struct User user, int sockfd)
 {
 	char send_buf[BUFSIZE];
@@ -101,7 +102,7 @@ close_session(struct User user, int sockfd)
 
 }
 
-void
+static void
 send_recv(int i, int sockfd, struct User user)
 {
 	char send_buf[BUFSIZE];
@@ -114,38 +115,68 @@ send_recv(int i, int sockfd, struct User user)
 	struct tm *timeinfo;
 	int sn_bytes;
 
-	if (i == 0) {
-		fgets(message_str, BUFSIZE, stdin);
-		if (!(strcmp(message_str, "/quit\n"))) {
-			close_session(user, sockfd);
-			exit(0);
-		} else if (message_str[0] == '/') {
-			cmd_prompt(user, message_str, sockfd);
-		} else {
-
-			time(&rawtime);
-			timeinfo = localtime(&rawtime);
-			strftime(stime, sizeof(stime), "%H:%M:%S", timeinfo);
-
-			sn_bytes = sprintf(send_buf, "%s room: (%s) (%s): %s",
-			    user.room, user.name, stime, message_str);
-			send_buf[sn_bytes] = '\0';
-			send(sockfd, send_buf, sn_bytes, 0);
-		}
-	} else {
+	if (i != SEND) {
 		nbyte_recvd = recv(sockfd, recv_buf, BUFSIZE, 0);
 		recv_buf[nbyte_recvd] = '\0';
 
 		sscanf(recv_buf, "%s ", room);
 
-		if (!(strcmp(room, user.room)))
+		if (strcmp(room, user.room) == 0)
 			printf("%s\n", recv_buf);
-
-		fflush (stdout);
+		return;
 	}
+	
+	
+	fgets(message_str, BUFSIZE, stdin);
+	
+	if (strcmp(message_str, "/quit\n") == 0) {
+		close_session(user, sockfd);
+		exit(0);
+	}
+	
+	if (message_str[0] == '/'){
+		cmd_prompt(user, message_str, sockfd);
+		return;
+	}
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(stime, sizeof(stime), "%H:%M:%S", timeinfo);
+
+	sn_bytes = sprintf(send_buf, "%s room: (%s) (%s): %s",
+	    user.room, user.name, stime, message_str);
+	send_buf[sn_bytes] = '\0';
+	send(sockfd, send_buf, sn_bytes, 0);
+
 }
 
-int
+static void
+curse_operator(void)
+{
+	int i;
+
+	srand(time(NULL));
+
+	i = rand() % 3;
+
+	switch(i) {
+	case 0:
+		printf("you are mocking or you are turding?\n");
+		break;
+	case 1:
+		printf("There must be cure for it!\n");
+		break;
+	case 2:
+		printf("Oww maybe your mother don't permit this!\n");
+		break;
+	case 3:
+		printf("Did you ask your parents' the permission\n");
+		break;
+	}
+
+}
+
+static int
 connect_request(int *sockfd, struct sockaddr_in *server_addr)
 {
 	if ((*sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -158,8 +189,7 @@ connect_request(int *sockfd, struct sockaddr_in *server_addr)
 	server_addr->sin_addr.s_addr = inet_addr(SERVER_IP);
 	memset(server_addr->sin_zero, '\0', sizeof server_addr->sin_zero);
 
-	if (connect
-	    (*sockfd, (struct sockaddr *) server_addr,
+	if (connect (*sockfd, (struct sockaddr *) server_addr,
 		sizeof(struct sockaddr)) < 0) {
 		perror("connect");
 		close(*sockfd);
@@ -180,15 +210,15 @@ main(int argc, char *argv[])
 
 	if (argc < 2) {
 		getlogin_r(user.name, sizeof(user.name));
-		if (!strcmp(user.name,""))
+		if (strcmp(user.name,"") == 0 )
 			printf
 			    ("\nNO user informed: Using system's username: %s\n",
 			    user.name);
 	} else if (argc == 3 || argc > 3) {
-		strncpy(user.room, argv[2], (sizeof(argv[2])+1));
-		strncpy(user.name, argv[1], (sizeof(argv[1])+1));
+		strncpy(user.room, argv[2], sizeof(argv[2])+1);
+		strncpy(user.name, argv[1], sizeof(argv[1])+1);
 	} else
-		strncpy(user.name, argv[1], (sizeof(argv[1])+1));
+		strncpy(user.name, argv[1], sizeof(argv[1])+1);
 
 	
 
@@ -223,6 +253,7 @@ main(int argc, char *argv[])
 			if (FD_ISSET(i, &read_fds))
 				send_recv(i, sockfd, user);
 	}
+
 	close (sockfd);
 	return 0;
 }

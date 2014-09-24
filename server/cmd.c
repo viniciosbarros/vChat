@@ -38,6 +38,18 @@
 #include "log.h"
 #include "server.h"
 
+#define CALL_SQLITE(f)											\
+	{															\
+		int i;													\
+		i = sqlite3_ ## f;										\
+		if (i != SQLITE_OK) {									\
+			log_debug ("%s failed with status %d: %s\n", #f, i, \
+				sqlite3_errmsg(passwd_db));						\
+				return (CMD_NOT_AUTHORIZED);					\
+		}														\
+	}															\
+
+
 static sqlite3 *passwd_db = NULL;
 
 static void matche(const char *, const char *, ...);
