@@ -42,7 +42,6 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 	if (dlen == 0) {
 		log_debug("Client: %d disconnected by remote\n", cl->cl_fd);
 		remove_client(cl);
-		free(cl);
 		return;
 	}
 
@@ -51,7 +50,6 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 	if (buf[0] == '/') {
 		log_debug("command received: %s\n", buf);
 		ret = command(buf, cl, handler);
-		log_debug("ret: %d\n", ret);
 		if (ret == CMD_AUTHORIZED && (strcmp(handler,"/connect")==0))
 			strncpy(buf, "ok", dlen);
 		if (ret == CMD_NOT_AUTHORIZED && (strcmp(handler,"/connect")==0)) {
@@ -60,7 +58,6 @@ peer_read_cb(struct bufferevent *bufev, void *bula)
 		}
 	}
 
-	log_debug("RESPONSE: %s - %s - %d\n", buf, handler, ret);
 	response(cl, buf, dlen, ret, handler);
 
 }
@@ -98,8 +95,6 @@ response(struct client *cl, const char *buf, size_t dlen,
 	char snd_buf[PEER_MSG];
 	size_t sn_size;
 
-
-	log_debug("RESPONSE-1: %d %s %s\n", dest, buf, dst_name);
 
 	/* In case buf was a command response */
 	if (dest == CMD_RESPONSE) {

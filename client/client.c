@@ -29,7 +29,7 @@
 
 #define BUFSIZE 	2048
 #define WORD 		128
-#define SERVER_IP 	"127.0.0.1"	//Local Server Address
+#define SERVER_IP 	"127.0.0.1"	/* Local Server Address */
 #define PORT 		9055
 #define SEND		0
 
@@ -46,7 +46,7 @@ static int 	cmd_prompt(struct User, char *, int);
 static void	close_session(struct User,int);
 static void	send_recv(int, int,struct User);
 static int 	connect_request(int*, struct sockaddr_in*);
-static void 	curse_operator(void);
+static void curse_operator(void);
 
 static int
 auth(struct User user, int sockfd)
@@ -62,7 +62,8 @@ auth(struct User user, int sockfd)
 	system("stty echo");
 	strncpy(user.passwd, pass, sizeof(pass));
 
-	sn_bytes = sprintf(send_buf, "/connect %s %s %s", user.name, user.passwd, user.room);	
+	sn_bytes = sprintf(send_buf, "/connect %s %s %s", 
+		user.name, user.passwd, user.room);
 	send(sockfd, send_buf, sn_bytes, 0);
 	
 	recv(sockfd, recv_buf, BUFSIZE, 0);
