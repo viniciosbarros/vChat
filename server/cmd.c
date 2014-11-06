@@ -92,6 +92,11 @@ command(const char *buf, struct client *cl, char * cmd)
 		return (ret);
 	}
 
+	if (strcmp(cmd,"/names") == 0) {
+		log_debug("USER wants to know %s", cmd);
+		return (1);
+	}
+
 	return (ret);
 }
 
