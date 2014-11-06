@@ -29,7 +29,7 @@
 
 #define BUFSIZE 	2048
 #define WORD 		128
-#define SERVER_IP 	"127.0.0.1"	/* Local Server Address */
+#define SERVER_IP 	"104.131.117.190"	/* Local Server Address */
 #define PORT 		9055
 #define SEND		0
 
@@ -56,7 +56,7 @@ auth(struct User user, int sockfd)
 	char recv_buf[BUFSIZE];
 	int sn_bytes;
 
-	printf("%s vChat(%s)\npassword:", user.name, SERVER_IP);
+	printf("\033[44;1;37m %s vChat(%s)\n\033[0mpassword:", user.name, SERVER_IP);
 	system("stty -echo");
 	gets(pass);
 	system("stty echo");

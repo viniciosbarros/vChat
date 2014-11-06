@@ -175,7 +175,7 @@ main(int argc, char *argv[])
 	if (opts & OPTS_VERBOSE)
 		log_verbose(1);
 
-	log_debug("vCHAT in the flow");
+	log_debug("vCHAT in the even flow");
 
 	event_init();
 
